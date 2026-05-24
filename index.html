@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Repo to Architecture Mapper</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Repo to Architecture Mapper</h1>
+    <p class="sub">
+      Paste a public GitHub URL. Get an interactive dependency graph, a list
+      of manifests with their dependencies, and inferred setup docs.
+    </p>
+  </header>
+
+  <main>
+    <aside class="sidebar">
+      <label>
+        <span>GitHub repo URL</span>
+        <input id="url" type="text" placeholder="https://github.com/owner/repo" autocomplete="off">
+      </label>
+
+      <label>
+        <span>GitHub token (optional)</span>
+        <input id="github-token" type="password" placeholder="ghp_..." autocomplete="off">
+        <small>Raises the GitHub rate limit from 60/hr to 5000/hr. No scopes needed for public repos.</small>
+      </label>
+
+      <label>
+        <span>Max source files: <output id="max-files-value">60</output></span>
+        <input id="max-files" type="range" min="10" max="200" step="10" value="60">
+        <small>Cap on source files fetched for import parsing.</small>
+      </label>
+
+      <label>
+        <span>Graph collapse depth: <output id="depth-value">2</output></span>
+        <input id="depth" type="range" min="1" max="5" value="2">
+        <small>How coarse the module graph is. 1 = very coarse; 5 = granular.</small>
+      </label>
+
+      <button id="analyze" type="button">Analyze</button>
+      <p class="note">Tokens are sent with this request only. Nothing is stored.</p>
+    </aside>
+
+    <section class="content">
+      <div id="status" class="status"></div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="summary" role="tab">Summary</button>
+        <button class="tab" data-tab="graphs" role="tab">Dependency graph</button>
+        <button class="tab" data-tab="setup" role="tab">Setup docs</button>
+        <button class="tab" data-tab="manifests" role="tab">Manifests</button>
+        <button class="tab" data-tab="context" role="tab">Raw context</button>
+      </nav>
+
+      <div id="tab-summary" class="tab-panel active">
+        <p class="placeholder">Paste a GitHub URL and click Analyze to begin.</p>
+      </div>
+      <div id="tab-graphs" class="tab-panel"></div>
+      <div id="tab-setup" class="tab-panel"></div>
+      <div id="tab-manifests" class="tab-panel"></div>
+      <div id="tab-context" class="tab-panel"></div>
+    </section>
+  </main>
+</body>
+</html>
