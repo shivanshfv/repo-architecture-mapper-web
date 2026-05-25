@@ -1,6 +1,10 @@
-"""Vercel serverless function: fetch a GitHub repo, return structured analysis.
+"""Single entrypoint for the deployed app.
 
-POST body:
+Vercel's Python runtime routes every request through this handler, so it
+serves both the static frontend (GET /, /app.js, /styles.css) and the
+analysis endpoint (POST /api/analyze).
+
+POST /api/analyze body:
   {
     "url": "https://github.com/owner/repo",
     "github_token": "<optional>",
@@ -14,6 +18,7 @@ import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler
+from urllib.parse import urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,6 +28,21 @@ from analyzer.graph import build_graph_json
 from analyzer.imports import collect_edges, edge_summary
 from analyzer.manifests import discover_manifests
 from analyzer.setup_docs import build_setup_docs
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+STATIC_ROUTES = {
+    "/": "index.html",
+    "/index.html": "index.html",
+    "/app.js": "app.js",
+    "/styles.css": "styles.css",
+}
+
+CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+}
 
 
 def _serialize_manifest(m):
@@ -48,7 +68,31 @@ def _serialize_summary(summary):
 
 
 class handler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+        path = urlparse(self.path).path
+        target = STATIC_ROUTES.get(path)
+        if target is None:
+            return self._not_found()
+        file_path = os.path.join(PROJECT_ROOT, target)
+        try:
+            with open(file_path, "rb") as f:
+                body = f.read()
+        except FileNotFoundError:
+            return self._not_found()
+        ext = os.path.splitext(target)[1]
+        ctype = CONTENT_TYPES.get(ext, "application/octet-stream")
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_POST(self):
+        path = urlparse(self.path).path
+        if path != "/api/analyze":
+            return self._not_found()
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length)) if length else {}
@@ -102,7 +146,7 @@ class handler(BaseHTTPRequestHandler):
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def _json(self, payload, status=200):
@@ -113,6 +157,14 @@ class handler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
         self.wfile.write(body)
+
+    def _not_found(self):
+        msg = b"Not found"
+        self.send_response(404)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(msg)))
+        self.end_headers()
+        self.wfile.write(msg)
 
     def log_message(self, format, *args):  # noqa: A002
         return
